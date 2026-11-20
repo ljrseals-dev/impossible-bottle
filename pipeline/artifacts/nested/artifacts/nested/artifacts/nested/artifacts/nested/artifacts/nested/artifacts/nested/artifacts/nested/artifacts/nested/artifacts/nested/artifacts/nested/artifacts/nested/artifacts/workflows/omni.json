@@ -1,0 +1,40 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "inputs": {
+      "ckpt_name": "flux1-dev.safetensors"
+    }
+  },
+  "2": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "hbo/graded_bottle.png"
+    }
+  },
+  "3": {
+    "class_type": "OmniPSDLoader",
+    "inputs": {
+      "model": ["1", 0],
+      "vae": ["1", 2]
+    }
+  },
+  "4": {
+    "class_type": "OmniPSDExtractLayers",
+    "inputs": {
+      "image": ["2", 0],
+      "omnipsd": ["3", 0],
+      "extract_order": "text,foreground,background",
+      "iterations": 3,
+      "rgba_vae": true
+    }
+  },
+  "5": {
+    "class_type": "OmniPSDSavePSD",
+    "inputs": {
+      "layers": ["4", 0],
+      "filename_prefix": "omni/bottle_layers",
+      "compression": 6,
+      "embed_smart_objects": true
+    }
+  }
+}
