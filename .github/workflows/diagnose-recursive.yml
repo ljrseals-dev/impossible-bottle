@@ -1,0 +1,45 @@
+name: Diagnose nested tar archives
+on:
+  push:
+    branches: [extract/impossible-bottle-pipeline]
+    paths: [.github/workflows/diagnose-recursive.yml]
+permissions:
+  contents: write
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: extract/impossible-bottle-pipeline
+          fetch-depth: 0
+      - name: Validate archive metadata
+        run: |
+          python3 - <<'PY'
+          import pathlib, tarfile
+          out=[]
+          for a in sorted(pathlib.Path("pipeline").rglob("*.tar.gz")):
+              out.append(f"ARCHIVE {a} size={a.stat().st_size}")
+              try:
+                  with tarfile.open(a,"r:gz") as tf:
+                      ms=tf.getmembers()
+                      out.append(f"MEMBERS {len(ms)}")
+                      for m in ms:
+                          p=pathlib.PurePosixPath(m.name)
+                          reason=[]
+                          if not m.name or m.name.startswith("/") or "\\" in m.name or any(x in ("",".","..") for x in p.parts): reason.append("unsafe-path")
+                          if not (m.isdir() or m.isfile()): reason.append("unsupported-type")
+                          if m.size<0 or m.size>250*1024*1024: reason.append("member-size")
+                          if reason: out.append(f"REJECT {m.name!r} {reason}")
+                      out.append("VALIDATION_SCAN_DONE")
+              except Exception as e: out.append(f"ERROR {type(e).__name__}: {e}")
+          pathlib.Path("NESTED-DIAGNOSTIC.txt").write_text("\n".join(out)+"\n")
+          print("\n".join(out))
+          PY
+      - name: Commit report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add NESTED-DIAGNOSTIC.txt
+          git commit -m "Diagnose nested archive validation"
+          git push origin HEAD:extract/impossible-bottle-pipeline
