@@ -1,0 +1,44 @@
+name: Diagnose remaining nested archive
+
+on:
+  push:
+    branches:
+      - extract/impossible-bottle-pipeline
+    paths:
+      - .github/workflows/diagnose-nested.yml
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: extract/impossible-bottle-pipeline
+          fetch-depth: 0
+      - name: Inspect remaining archives
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, tarfile
+          report = []
+          for archive in sorted(pathlib.Path("pipeline").rglob("*.tar.gz")):
+              report.append(f"ARCHIVE {archive} bytes={archive.stat().st_size}")
+              try:
+                  with tarfile.open(archive, "r:gz") as tf:
+                      for m in tf.getmembers():
+                          report.append(f"{m.type!r} size={m.size} name={m.name!r}")
+              except Exception as exc:
+                  report.append(f"ERROR {type(exc).__name__}: {exc}")
+          pathlib.Path("NESTED-ARCHIVE-REPORT.txt").write_text("\n".join(report) + "\n")
+          print("\n".join(report))
+          PY
+      - name: Commit archive report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add NESTED-ARCHIVE-REPORT.txt
+          git commit -m "Report nested archive contents"
+          git push origin HEAD:extract/impossible-bottle-pipeline
