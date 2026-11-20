@@ -1,0 +1,4 @@
+torch>=2.3
+numpy
+Pillow
+psd-tools[composite]>=1.18.0
